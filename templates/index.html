@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BJT DC Bias Calculator — Lab 02</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">ENG29 2121 · LAB 02</p>
+    <h1>BJT DC Bias Calculator</h1>
+    <p class="sub">NPN Common-Emitter · Voltage-Divider Bias · Forward-Active Approximation</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>1. ป้อนค่าอุปกรณ์</h2>
+      <form method="post" action="{{ url_for('submit') }}" novalidate>
+        <div class="grid">
+          <label>VCC (V)
+            <input type="text" inputmode="decimal" name="vcc" value="{{ values.vcc }}" required>
+          </label>
+          <label>R1 (kΩ)
+            <input type="text" inputmode="decimal" name="r1" value="{{ values.r1 }}" required>
+          </label>
+          <label>R2 (kΩ)
+            <input type="text" inputmode="decimal" name="r2" value="{{ values.r2 }}" required>
+          </label>
+          <label>RC (kΩ)
+            <input type="text" inputmode="decimal" name="rc" value="{{ values.rc }}" required>
+          </label>
+          <label>RE (kΩ)
+            <input type="text" inputmode="decimal" name="re" value="{{ values.re }}" required>
+          </label>
+          <label>β (Beta)
+            <input type="text" inputmode="decimal" name="beta" value="{{ values.beta }}" required>
+          </label>
+          <label>VBE (V)
+            <input type="text" inputmode="decimal" name="vbe" value="{{ values.vbe }}" required>
+          </label>
+        </div>
+
+        <button type="submit">Calculate DC Bias</button>
+      </form>
+
+      {% if error %}
+      <div class="alert" role="alert">
+        <strong>ไม่สามารถคำนวณได้:</strong> {{ error }}
+      </div>
+      {% endif %}
+    </section>
+
+    {% if result %}
+    <section class="card" id="results">
+      <h2>2. DC Bias Results</h2>
+      <p class="region {{ result.region }}">
+        Operating Region: <strong>{{ region_labels[result.region] }}</strong>
+      </p>
+
+      <div class="tables">
+        <table>
+          <caption>แรงดัน (Voltage)</caption>
+          <tbody>
+            <tr><th>VB</th><td>{{ result.vb|fmt }} V</td></tr>
+            <tr><th>VE</th><td>{{ result.ve|fmt }} V</td></tr>
+            <tr><th>VC</th><td>{{ result.vc|fmt }} V</td></tr>
+            <tr><th>VCE</th><td>{{ result.vce|fmt }} V</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <caption>กระแส (Current)</caption>
+          <tbody>
+            <tr><th>IB</th><td>{{ (result.ib * 1000000)|fmt }} µA</td></tr>
+            <tr><th>IC</th><td>{{ (result.ic * 1000)|fmt }} mA</td></tr>
+            <tr><th>IE</th><td>{{ (result.ie * 1000)|fmt }} mA</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted">
+        VTH = {{ result.vth|fmt }} V · RTH = {{ result.rth|fmt }} kΩ ·
+        VCE_SAT = 0.3 V
+      </p>
+
+      {% for warning in result.warnings %}
+      <div class="warning" role="status">{{ warning }}</div>
+      {% endfor %}
+
+      <p class="footnote">
+        ผลนี้คำนวณจากแบบจำลอง Forward-Active (β และ VBE คงที่) ไม่ใช่การจำลอง SPICE
+        และไม่น่าเชื่อถือเมื่ออยู่นอกช่วง Active
+      </p>
+    </section>
+    {% endif %}
+  </main>
+
+  <footer>ENG29 2121 · Lab 02 · Flask + Python Backend</footer>
+</body>
+</html>
