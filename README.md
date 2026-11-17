@@ -1,23 +1,29 @@
-# BJT DC Bias Web App — ENG29 2121 Lab 02
+# BJT DC Bias Web App — ENG29 2121 Lab 03
 
 Flask Web Application สำหรับคำนวณ **DC Operating Point** ของวงจร NPN
-Common-Emitter แบบ **Voltage-Divider Bias** ด้วยแบบจำลอง Forward-Active
-(β และ VBE คงที่)
+Common-Emitter ด้วยแบบจำลอง Forward-Active (β และ VBE คงที่) เลือกได้สามโหมด
+
+| โหมด | อุปกรณ์ | ค่าที่ต้องกรอกเพิ่ม |
+|---|---|---|
+| **Voltage Divider Bias** | R1, R2, RC, RE | – (โหมดเดิมของ Lab 02) |
+| **Fixed Bias** | RB, RC (Emitter ลงกราวด์) | RB |
+| **Emitter Bias** | RB, RC, RE | RB, RE |
 
 หน้าเว็บรับค่าอุปกรณ์ แล้วส่ง HTTP POST ไปให้ Python Backend คำนวณ
-ไม่ใช่ตัวเลขที่ฝังไว้ใน HTML
+ไม่ใช่ตัวเลขที่ฝังไว้ใน HTML — เลือก Divider ด้วยค่าเดิมของ Lab 02 แล้วผล
+ต้องเท่าเดิมเป๊ะ (IC 1.2299 mA, VCE 8.0522 V)
 
 ## โครงสร้าง
 
 ```
-app.py                  Flask routes (GET /, POST /)
+app.py                  Flask routes (GET /, POST /) + เลือกโหมดที่แสดง
 dc_bias.py              Validation + สมการวิศวกรรม (ไม่รู้จัก HTML/HTTP)
-templates/index.html    ฟอร์มและตารางผลลัพธ์ (Jinja)
-static/style.css        หน้าตา/responsive
+templates/index.html    ฟอร์ม, dropdown โหมด, ตารางผลลัพธ์ (Jinja)
+static/style.css        หน้าตา/responsive (CSS ล้วน ไม่มี JavaScript)
 tests/test_dc_bias.py   Unit tests ของสมการ
 tests/test_web.py       HTTP tests ด้วย Flask test client
-requirements.txt        Flask
-docs/                   Design note, validation, reflection
+opencode.json           ตั้งค่า MCP server (Playwright) สำหรับตรวจผ่าน Browser
+docs/                   Design note, validation, reflection, evidence/
 ```
 
 ## การติดตั้งและรัน
@@ -26,7 +32,7 @@ docs/                   Design note, validation, reflection
 python -m venv .venv
 .venv\Scripts\Activate.ps1          # macOS/Linux: source .venv/bin/activate
 python -m pip install -r requirements.txt
-python -m flask --app app run --debug
+python -m flask --app app run --port 5000
 ```
 
 เปิด <http://127.0.0.1:5000/>
@@ -40,59 +46,101 @@ python -m flask --app app run --debug
 .venv\Scripts\python -m unittest discover -s tests -v
 ```
 
-## ค่าเข้า / ค่าแสดงผล
+27 tests (19 unit + 8 HTTP) — ตามใบงาน Lab 03 ไม่ได้เพิ่ม unittest ใหม่
+สำหรับสองโหมดใหม่ แต่ปรับวิธีอ่านผลให้ตรงกับ `dict` ที่คืนจาก `calculate()`
+การตรวจรับของโหมดใหม่ทำผ่าน Browser (ดูหัวข้อถัดไป)
 
-| ข้อมูลเข้า | หน่วย |
-|---|---|
-| VCC | V |
-| R1, R2, RC, RE | **kΩ** (Backend แปลงเป็น Ω) |
-| β | - |
-| VBE | V |
+## ช่องอินพุตต่อโหมด
 
-| ข้อมูลออก | หน่วย |
-|---|---|
-| VB, VE, VC, VCE | V |
-| IC, IE | mA |
-| IB | µA |
+| ช่อง | divider | fixed | emitter |
+|---|---|---|---|
+| VCC (V) | ✓ | ✓ | ✓ |
+| R1, R2 (kΩ) | ✓ | – | – |
+| RB (kΩ) | – | ✓ | ✓ |
+| RC (kΩ) | ✓ | ✓ | ✓ |
+| RE (kΩ) | ✓ | – | ✓ |
+| β | ✓ | ✓ | ✓ |
+| VBE (V) | ✓ | ✓ | ✓ |
+
+ช่องที่ไม่ใช้จะถูกซ่อนด้วย CSS (`field--unused`) แต่ยังถูกส่งไปกับฟอร์ม
+`parse_inputs()` อ่านเฉพาะช่องของโหมดนั้น ค่าขยะในช่องอื่นจึงไม่ทำให้ error
+
+## ข้อมูลออก
+
+| ข้อมูลออก | หน่วย | คีย์ใน `dict` |
+|---|---|---|
+| VB, VE, VC, VCE | V | `vb_v, ve_v, vc_v, vce_v` |
+| IB | µA | `ib_ua` |
+| IC, IE | mA | `ic_ma, ie_ma` |
+| VTH, RTH (divider) | V, kΩ | `vth_v, rth_kohm` |
+| Region | – | `region` (`active`/`cutoff`/`saturation`) |
+| คำเตือน | – | `warnings` |
 
 ## สมการ
 
 ```
-VTH = VCC·R2/(R1+R2)
-RTH = R1·R2/(R1+R2)                 [kΩ]
-IB  = (VTH − VBE) / ((RTH + (β+1)·RE)·1000)
+Divider : VTH = VCC·R2/(R1+R2) ,  RTH = R1·R2/(R1+R2)      [kΩ]
+          IB  = (VTH − VBE) / ((RTH + (β+1)·RE) · 1000)
+Fixed   : IB  = (VCC − VBE) / (RB · 1000)
+Emitter : IB  = (VCC − VBE) / ((RB + (β+1)·RE) · 1000)
+
+ใช้ร่วมกันทุกโหมด
 IC  = β·IB ,  IE = (β+1)·IB
-VE  = IE·RE·1000 ,  VB = VE + VBE
-VC  = VCC − IC·RC·1000 ,  VCE = VC − VE
+VE  = IE·RE·1000            (Fixed: RE = 0 → VE = 0)
+VB  = VE + VBE
+VC  = VCC − IC·RC·1000
+VCE = VC − VE
 ```
 
 ## Validation และ Warning
 
-- ค่าที่ไม่ใช่ตัวเลข, ค่าที่หายไป, R ≤ 0, β ≤ 0, VCC ≤ 0, VBE < 0,
-  VBE ≥ VCC → แสดง error ภาษาไทยและตอบ HTTP 400 (หน้าเว็บไม่ล้ม)
-- `VTH ≤ VBE` → Region **Cutoff** พร้อม warning ว่าสมการ Forward-Active ใช้ไม่ได้
-  (แสดงกระแสเป็นศูนย์)
-- `VCE < VCE_SAT = 0.3 V` → Region **Saturation** พร้อม warning ว่าค่าจาก
-  Forward-Active ไม่น่าเชื่อถือ
+**อินพุตผิด → HTTP 400 + ข้อความไทย (หน้าเว็บไม่ล้ม)**
 
-## ค่าอ้างอิงจากเอกสาร Lab
+- ค่าหายไป, ไม่ใช่ตัวเลข, เป็น `inf`/`nan`
+- ตัวต้านทานหรือ VCC ≤ 0, β ≤ 0, VBE < 0, VBE ≥ VCC
+- ไม่ส่ง `mode` มา หรือส่งค่าที่ไม่รู้จัก → error (ไม่เดาเป็น Divider)
 
-VCC=12 V, R1=100 kΩ, R2=22 kΩ, RC=2.2 kΩ, RE=1 kΩ, β=100, VBE=0.70 V
+**แบบจำลองใช้ไม่ได้ → warning (ยังแสดงผล)**
 
-| ปริมาณ | ค่า |
-|---|---|
-| VTH | 2.164 V |
-| RTH | 18.033 kΩ |
-| IB | 12.298 µA |
-| IC | 1.230 mA |
-| IE | 1.242 mA |
-| VE | 1.242 V |
-| VB | 1.942 V |
-| VC | 9.294 V |
-| VCE | 8.052 V |
-| Region | Active |
+- `IB ≤ 0` → Region **Cutoff** (แสดงกระแสเป็นศูนย์)
+- `VCE ≤ VCE_SAT = 0.2 V` → Region **Saturation** + เตือนว่า
+  Forward-Active Approximation ไม่น่าเชื่อถือ
+
+## ค่าอ้างอิง A1–A5 (VCC = 12 V, RC = 2.2 kΩ, β = 100, VBE = 0.70 V)
+
+| กรณี | โหมด | อินพุต | IC | VCE |
+|---|---|---|---|---|
+| A1 | divider | R1=100k, R2=22k, RE=1k | 1.2299 mA | 8.0522 V |
+| A2 | fixed | RB=1 MΩ | 1.1300 mA | 9.5140 V |
+| A3 | emitter | RB=1 MΩ, RE=1 kΩ | 1.0263 mA | 8.7054 V |
+| A4 | emitter | RB=1 MΩ, RE=2 kΩ | 0.9401 mA | 8.0328 V |
+| A5 | fixed | RB=0 | — | HTTP 400 |
+
+ภาพหน้าจอจากการตรวจผ่าน Playwright MCP อยู่ที่ `docs/evidence/`
+รายละเอียดการคำนวณมือและค่าที่อ่านได้จริงอยู่ที่ `docs/validation.md`
+
+## การตรวจผ่าน Browser ด้วย Playwright MCP
+
+`opencode.json` ตั้ง MCP server ไว้ให้แล้ว (ต้องมี Node.js และ `npx` ใน PATH)
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "playwright": {
+        "type": "local",
+        "command": ["npx", "-y", "@playwright/mcp@latest", "--browser", "chrome", "--isolated"]
+      }
+    }
+  }
+}
+```
+
+ตรวจสถานะด้วย `opencode mcp list` ต้องขึ้น `✓ playwright connected`
+แล้วสั่ง agent ให้เปิด <http://127.0.0.1:5000/> กรอกค่า และอ่านผลจากหน้าเว็บ
 
 ## ข้อจำกัด
 
 แบบจำลองนี้ไม่ใช่ SPICE/ngspice, ใช้ β คงที่, ไม่มี Early effect,
-ไม่ครอบคลุม AC/Transient และไม่ควรใช้ตัดสินใจออกแบบจริงนอกช่วง Forward-Active
+ไม่มี DC Load Line / AC / Transient / bypass capacitor และไม่ควรใช้
+ตัดสินใจออกแบบจริงนอกช่วง Forward-Active
