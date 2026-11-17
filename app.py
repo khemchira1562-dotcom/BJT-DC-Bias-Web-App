@@ -59,6 +59,7 @@ def _render(
     error: str | None = None,
     status: int = 200,
 ):
+    display_mode = _display_mode(values)
     return (
         render_template(
             "index.html",
@@ -67,7 +68,8 @@ def _render(
             error=error,
             region_labels=REGION_LABELS,
             mode_labels=MODE_LABELS,
-            active_fields=MODE_FIELDS[_display_mode(values)],
+            display_mode=display_mode,
+            active_fields=MODE_FIELDS[display_mode],
             vce_sat=VCE_SAT,
         ),
         status,
@@ -83,6 +85,11 @@ def index():
 def submit():
     values = {"mode": request.form.get("mode", "").strip()}
     values.update({name: request.form.get(name, "").strip() for name in FIELD_NAMES})
+
+    # Switching mode must not silently calculate from a field the user could
+    # not see: "แสดงช่องของโหมดนี้" only re-renders the form.
+    if request.form.get("action") == "layout":
+        return _render(values)
 
     try:
         result = calculate(values["mode"], parse_inputs(values))

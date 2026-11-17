@@ -356,3 +356,21 @@ VCE = 12 − 1.979×2.2 − 2.0 = 5.65 V
   ลืมเขียน test
 - ระหว่างพัฒนา ผมยังใช้ `python -c` / เรียกฟังก์ชันตรง ๆ ตรวจค่าก่อนเปิด
   เบราว์เซอร์ได้ แต่จะไม่เพิ่มไฟล์ test เข้า repo
+
+## 12. การเปลี่ยนแปลงหลัง code review (2026-11-17)
+
+รีวิวทั้ง branch ด้วย reviewer ใหม่ 1 ครั้ง (diff `7b2f6f8..8ec19b6`) ไม่พบ
+Critical พบ Important 1 ข้อ และ Minor หลายข้อ ที่นำมาแก้ในรอบเดียว
+
+| ข้อ | ที่พบ | ที่แก้ |
+|---|---|---|
+| Important | สลับโหมดแล้วกด Calculate ทันที จะคำนวณจากช่องที่ซ่อนอยู่ (RB = 1000 ตอนอยู่โหมด Divider) ซึ่งผู้ใช้ไม่เคยเห็น — ขัดกับเหตุผลของ D2=A ที่เขียนว่า "กดครั้งเดียว" | เพิ่มปุ่ม **แสดงช่องของโหมดนี้** (`action=layout`) ที่ render ฟอร์มใหม่โดยไม่คำนวณ พร้อมคำอธิบายใน README และบนหน้าเว็บ |
+| Minor | Divider cutoff สูญเสียข้อความเหตุผลเดิม (VTH ≤ VBE) | `_assemble(cutoff_reason=...)` ให้ divider ส่งข้อความ `VTH = ... ≤ VBE = ...` |
+| Minor | `selected` ของ dropdown ใช้ `values.mode` ขณะที่ `active_fields` ใช้ `display_mode` | ส่ง `display_mode` เข้า template แล้วใช้ค่านี้ทั้งสองที่ |
+| Minor | `BiasInputs.mode` เขียนแล้วไม่มีใครอ่าน และอาจขัดกับ `calculate(mode, inputs)` | `calculate()` ตรวจว่าค่าตรงกัน ไม่งั้น raise `InputError` |
+| Minor | `AGENTS.md` ไม่มีข้อยกเว้นเรื่อง test ของ Lab 03 | เพิ่ม pointer ไป `docs/validation.md` §11 |
+| Minor | ไม่มีคำอธิบายว่าหน้าเว็บปัดทศนิยมแต่เทียบค่าดิบ | เพิ่มหมายเหตุใน `docs/validation.md` §8 |
+| Minor | `@playwright/mcp@latest` ไม่ pin เวอร์ชัน | ระบุใน README ให้เปิดใช้เฉพาะตอนตรวจซ้ำ และต้องมี Node อยู่ใน PATH |
+
+ผลหลังแก้: 27 tests ยังผ่าน และตรวจซ้ำกรณีของ Review Focus ผ่านทั้งหมด
+(ดู `docs/validation.md` §9)

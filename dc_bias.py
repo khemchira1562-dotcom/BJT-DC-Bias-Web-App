@@ -148,6 +148,7 @@ def _assemble(
     *,
     vth: float | None = None,
     rth: float | None = None,
+    cutoff_reason: str | None = None,
 ) -> dict[str, object]:
     """Turn a base current into the shared result dict for every mode.
 
@@ -168,7 +169,8 @@ def _assemble(
         vc = inputs.vcc
         vce = inputs.vcc
         warnings: tuple[str, ...] = (
-            "IB ≤ 0: ทรานซิสเตอร์อยู่ในช่วง Cutoff "
+            cutoff_reason
+            or "IB ≤ 0: ทรานซิสเตอร์อยู่ในช่วง Cutoff "
             "สมการ Forward-Active ใช้ไม่ได้ ค่าที่แสดงคือกรณีกระแสเป็นศูนย์",
         )
     else:
@@ -215,7 +217,18 @@ def divider_bias(inputs: BiasInputs) -> dict[str, object]:
     rth = r1 * r2 / (r1 + r2)  # kΩ
 
     if vth <= inputs.vbe:
-        return _assemble(MODE_DIVIDER, 0.0, inputs, vth=vth, rth=rth)
+        return _assemble(
+            MODE_DIVIDER,
+            0.0,
+            inputs,
+            vth=vth,
+            rth=rth,
+            cutoff_reason=(
+                f"VTH = {vth:.3f} V ≤ VBE = {inputs.vbe:.2f} V: "
+                "ทรานซิสเตอร์อยู่ในช่วง Cutoff สมการ Forward-Active ใช้ไม่ได้ "
+                "ค่าที่แสดงคือกรณีกระแสเป็นศูนย์"
+            ),
+        )
 
     denominator = (rth + (inputs.beta + 1.0) * re) * 1000.0
     ib = (vth - inputs.vbe) / denominator
@@ -255,4 +268,6 @@ def calculate(mode: str, inputs: BiasInputs) -> dict[str, object]:
         raise InputError(
             f"โหมดไบอัสไม่รู้จัก: {mode} (รองรับ: divider, fixed, emitter)"
         )
+    if inputs.mode != mode:
+        raise InputError("ข้อมูลภายในไม่ตรงกัน: โหมดในฟอร์มกับโหมดที่คำนวณไม่ใช่ค่าเดียวกัน")
     return handler(inputs)

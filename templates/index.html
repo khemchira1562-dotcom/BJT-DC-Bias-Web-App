@@ -20,9 +20,10 @@
         <label class="mode-row">โหมดไบอัส
           <select name="mode">
             {% for mode in mode_labels %}
-            <option value="{{ mode }}" {% if mode == values.mode %}selected{% endif %}>{{ mode_labels[mode] }}</option>
+            <option value="{{ mode }}" {% if mode == display_mode %}selected{% endif %}>{{ mode_labels[mode] }}</option>
             {% endfor %}
           </select>
+          <span class="hint">เปลี่ยนโหมดแล้วกด «แสดงช่องของโหมดนี้» เพื่อดูช่องที่ต้องกรอก</span>
         </label>
 
         <div class="grid">
@@ -52,7 +53,10 @@
           </label>
         </div>
 
-        <button type="submit">Calculate DC Bias</button>
+        <div class="actions">
+          <button type="submit" name="action" value="calculate">Calculate DC Bias</button>
+          <button type="submit" name="action" value="layout" class="secondary">แสดงช่องของโหมดนี้</button>
+        </div>
       </form>
 
       {% if error %}
