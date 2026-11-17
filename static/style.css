@@ -128,3 +128,7 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 8px 
   .card { padding: 18px 16px; }
   .hero { padding: 28px 18px; }
 }
+
+.mode-row { display: block; margin-bottom: 14px; }
+.mode-row select { font: inherit; padding: 8px 10px; width: 100%; max-width: 360px; }
+.field--unused { display: none; }

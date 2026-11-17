@@ -7,14 +7,26 @@ from __future__ import annotations
 
 from flask import Flask, render_template, request
 
-from dc_bias import FIELD_NAMES, InputError, calculate, parse_inputs
+from dc_bias import (
+    FIELD_NAMES,
+    MODE_DIVIDER,
+    MODE_FIELDS,
+    MODE_LABELS,
+    MODES,
+    VCE_SAT,
+    InputError,
+    calculate,
+    parse_inputs,
+)
 
 app = Flask(__name__)
 
 DEFAULT_VALUES = {
+    "mode": MODE_DIVIDER,
     "vcc": "12",
     "r1": "100",
     "r2": "22",
+    "rb": "1000",
     "rc": "2.2",
     "re": "1",
     "beta": "100",
@@ -34,41 +46,50 @@ def fmt(value: float, digits: int = 3) -> str:
     return f"{float(value):.{digits}f}"
 
 
+def _display_mode(values: dict[str, str]) -> str:
+    """Mode used to lay out the form; unknown modes fall back to the divider."""
+    mode = values.get("mode", "")
+    return mode if mode in MODES else MODE_DIVIDER
+
+
+def _render(
+    values: dict[str, str],
+    *,
+    result: dict[str, object] | None = None,
+    error: str | None = None,
+    status: int = 200,
+):
+    return (
+        render_template(
+            "index.html",
+            values=values,
+            result=result,
+            error=error,
+            region_labels=REGION_LABELS,
+            mode_labels=MODE_LABELS,
+            active_fields=MODE_FIELDS[_display_mode(values)],
+            vce_sat=VCE_SAT,
+        ),
+        status,
+    )
+
+
 @app.get("/")
 def index():
-    return render_template(
-        "index.html",
-        values=DEFAULT_VALUES,
-        result=None,
-        error=None,
-        region_labels=REGION_LABELS,
-    )
+    return _render(DEFAULT_VALUES)
 
 
 @app.post("/")
 def submit():
-    values = {name: request.form.get(name, "").strip() for name in FIELD_NAMES}
-    try:
-        result = calculate(parse_inputs(values))
-    except InputError as exc:
-        return (
-            render_template(
-                "index.html",
-                values=values,
-                result=None,
-                error=str(exc),
-                region_labels=REGION_LABELS,
-            ),
-            400,
-        )
+    values = {"mode": request.form.get("mode", "").strip()}
+    values.update({name: request.form.get(name, "").strip() for name in FIELD_NAMES})
 
-    return render_template(
-        "index.html",
-        values=values,
-        result=result,
-        error=None,
-        region_labels=REGION_LABELS,
-    )
+    try:
+        result = calculate(values["mode"], parse_inputs(values))
+    except InputError as exc:
+        return _render(values, error=str(exc), status=400)
+
+    return _render(values, result=result)
 
 
 if __name__ == "__main__":

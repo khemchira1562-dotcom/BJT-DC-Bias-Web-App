@@ -3,40 +3,51 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BJT DC Bias Calculator — Lab 02</title>
+  <title>BJT DC Bias Calculator — Lab 03</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <header class="hero">
-    <p class="eyebrow">ENG29 2121 · LAB 02</p>
+    <p class="eyebrow">ENG29 2121 · LAB 03</p>
     <h1>BJT DC Bias Calculator</h1>
-    <p class="sub">NPN Common-Emitter · Voltage-Divider Bias · Forward-Active Approximation</p>
+    <p class="sub">NPN Common-Emitter · Voltage Divider / Fixed / Emitter Bias · Forward-Active Approximation</p>
   </header>
 
   <main>
     <section class="card">
       <h2>1. ป้อนค่าอุปกรณ์</h2>
       <form method="post" action="{{ url_for('submit') }}" novalidate>
+        <label class="mode-row">โหมดไบอัส
+          <select name="mode">
+            {% for mode in mode_labels %}
+            <option value="{{ mode }}" {% if mode == values.mode %}selected{% endif %}>{{ mode_labels[mode] }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
         <div class="grid">
-          <label>VCC (V)
+          <label class="field">VCC (V)
             <input type="text" inputmode="decimal" name="vcc" value="{{ values.vcc }}" required>
           </label>
-          <label>R1 (kΩ)
-            <input type="text" inputmode="decimal" name="r1" value="{{ values.r1 }}" required>
+          <label class="field {% if 'rb' not in active_fields %}field--unused{% endif %}">RB (kΩ)
+            <input type="text" inputmode="decimal" name="rb" value="{{ values.rb }}">
           </label>
-          <label>R2 (kΩ)
-            <input type="text" inputmode="decimal" name="r2" value="{{ values.r2 }}" required>
+          <label class="field {% if 'r1' not in active_fields %}field--unused{% endif %}">R1 (kΩ)
+            <input type="text" inputmode="decimal" name="r1" value="{{ values.r1 }}">
           </label>
-          <label>RC (kΩ)
+          <label class="field {% if 'r2' not in active_fields %}field--unused{% endif %}">R2 (kΩ)
+            <input type="text" inputmode="decimal" name="r2" value="{{ values.r2 }}">
+          </label>
+          <label class="field">RC (kΩ)
             <input type="text" inputmode="decimal" name="rc" value="{{ values.rc }}" required>
           </label>
-          <label>RE (kΩ)
-            <input type="text" inputmode="decimal" name="re" value="{{ values.re }}" required>
+          <label class="field {% if 're' not in active_fields %}field--unused{% endif %}">RE (kΩ)
+            <input type="text" inputmode="decimal" name="re" value="{{ values.re }}">
           </label>
-          <label>β (Beta)
+          <label class="field">β (Beta)
             <input type="text" inputmode="decimal" name="beta" value="{{ values.beta }}" required>
           </label>
-          <label>VBE (V)
+          <label class="field">VBE (V)
             <input type="text" inputmode="decimal" name="vbe" value="{{ values.vbe }}" required>
           </label>
         </div>
@@ -53,7 +64,7 @@
 
     {% if result %}
     <section class="card" id="results">
-      <h2>2. DC Bias Results</h2>
+      <h2>2. DC Bias Results — {{ mode_labels[result.mode] }}</h2>
       <p class="region {{ result.region }}">
         Operating Region: <strong>{{ region_labels[result.region] }}</strong>
       </p>
@@ -62,26 +73,25 @@
         <table>
           <caption>แรงดัน (Voltage)</caption>
           <tbody>
-            <tr><th>VB</th><td>{{ result.vb|fmt }} V</td></tr>
-            <tr><th>VE</th><td>{{ result.ve|fmt }} V</td></tr>
-            <tr><th>VC</th><td>{{ result.vc|fmt }} V</td></tr>
-            <tr><th>VCE</th><td>{{ result.vce|fmt }} V</td></tr>
+            <tr><th>VB</th><td>{{ result.vb_v|fmt }} V</td></tr>
+            <tr><th>VE</th><td>{{ result.ve_v|fmt }} V</td></tr>
+            <tr><th>VC</th><td>{{ result.vc_v|fmt }} V</td></tr>
+            <tr><th>VCE</th><td>{{ result.vce_v|fmt }} V</td></tr>
           </tbody>
         </table>
 
         <table>
           <caption>กระแส (Current)</caption>
           <tbody>
-            <tr><th>IB</th><td>{{ (result.ib * 1000000)|fmt }} µA</td></tr>
-            <tr><th>IC</th><td>{{ (result.ic * 1000)|fmt }} mA</td></tr>
-            <tr><th>IE</th><td>{{ (result.ie * 1000)|fmt }} mA</td></tr>
+            <tr><th>IB</th><td>{{ result.ib_ua|fmt }} µA</td></tr>
+            <tr><th>IC</th><td>{{ result.ic_ma|fmt }} mA</td></tr>
+            <tr><th>IE</th><td>{{ result.ie_ma|fmt }} mA</td></tr>
           </tbody>
         </table>
       </div>
 
       <p class="muted">
-        VTH = {{ result.vth|fmt }} V · RTH = {{ result.rth|fmt }} kΩ ·
-        VCE_SAT = 0.3 V
+        {% if result.mode == 'divider' %}VTH = {{ result.vth_v|fmt }} V · RTH = {{ result.rth_kohm|fmt }} kΩ · {% endif %}VCE_SAT = {{ vce_sat|fmt(1) }} V
       </p>
 
       {% for warning in result.warnings %}
@@ -96,6 +106,6 @@
     {% endif %}
   </main>
 
-  <footer>ENG29 2121 · Lab 02 · Flask + Python Backend</footer>
+  <footer>ENG29 2121 · Lab 03 · Flask + Python Backend</footer>
 </body>
 </html>

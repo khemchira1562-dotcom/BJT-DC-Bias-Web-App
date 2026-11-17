@@ -5,6 +5,7 @@ import unittest
 from app import app
 
 REFERENCE = {
+    "mode": "divider",
     "vcc": "12",
     "r1": "100",
     "r2": "22",
