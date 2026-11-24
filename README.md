@@ -157,9 +157,14 @@ IC ในโหมด DC คำนวณจาก `(VCC − VC)/RC` และ IE
 - B1–B7 **PASS** ด้วย ngspice จริง + in-app browser ของ OpenCode
   (B2 DC `.op`, B3 เปลี่ยน RE, B4 AC Bode, B5 transient, B6 เปลี่ยน source,
   B7 invalid/engine-fail)
-- B8 mobile viewport **NOT RUN** (ตรวจเฉพาะ desktop, tool นี้ปรับ viewport ไม่ได้)
-- Playwright MCP **NOT RUN** — ใช้ in-app browser ของ OpenCode แทน
-  และบันทึกชื่อ tool ให้ตรงความจริง
+- B8 mobile viewport **NOT RUN** — มี render 390×844 จาก `impeccable shot` และ
+  detector exit 0 แต่ผู้ตรวจไม่รองรับ image input จึงยังไม่ได้อ่านภาพด้วยตา
+  (ดู `docs/evidence/impeccable/` และ `docs/validation.md` §15)
+- Playwright MCP **NOT RUN** — ติดตั้ง Node.js แล้วแต่ไม่มี tool โผล่ในเซสชัน
+  ใช้ in-app browser ของ OpenCode แทนและบันทึกชื่อ tool ให้ตรงความจริง
+- Impeccable v4.10.0 **RUN** — critique แบบ dual-agent ได้ 22/40, รัน polish
+  2 จุดที่อนุมัติ (ลบ kicker, `text-wrap: balance`) detector live ทั้ง 2 viewport
+  exit 0, 53 tests ยังผ่าน — P1 ที่ต้องแตะ `app.py`/`charts.py` ยังไม่แตะ
 - ผล SPICE ยังใช้ structural default model อยู่ ต้องแทนด้วย `.model` จาก Starter Kit
   ก่อนอ้างว่า validated ตามใบงาน
 

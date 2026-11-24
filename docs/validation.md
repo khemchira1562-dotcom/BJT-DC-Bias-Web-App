@@ -223,7 +223,7 @@ SourceForge ติดตั้งที่ `C:\Users\B6822019\AppData\Local\ngsp
 | **B5** | Transient ที่ 10 mV peak, 1 kHz เห็น Vin/Vout และทิศทางเฟส | **PASS** | `lab04_B5_transient.jpeg` — กราฟ `Time (ms)` จาก `.tran` จริง 508 จุด, Vin peak `10.00 mV`, Vout peak `17.49 mV`, ข้อความ `Vout กลับเฟสกับ Vin` |
 | **B6** | เปลี่ยน Amplitude/Frequency แล้ว waveform เปลี่ยน | **PASS** | `lab04_B6_change_source.jpeg` — เปลี่ยน `10 mV @ 1 kHz → 20 mV @ 2 kHz` แล้ว Vin peak `10.00 → 19.99 mV`, Vout peak `17.49 → 34.96 mV` และความถี่ waveforms เพิ่มขึ้นสองเท่า |
 | **B7** | Invalid / engine fail: ใส่ RE = 0 และ engine ไม่พร้อม | **PASS** | `lab04_B7_invalid_re.jpeg` → `RE (kΩ) ต้องมากกว่า 0`, HTTP 400, ไม่มีตารางผลค้าง / `lab04_B7_engine_unavailable.jpeg` → `ไม่พบ ngspice ใน PATH ... ห้ามแสดงผลสำเร็จหรือกราฟเก่า`, HTTP 400, ไม่มีผลค้าง (ภาพนี้ถ่ายก่อนติดตั้ง engine เมื่อ error path ยังจำลองได้จริง) |
-| **B8** | Desktop/Phone viewport, ป้าย/หน่วย/ปุ่มอ่านง่าย ไม่มีเนื้อหาถูกตัด | **NOT RUN** | ตรวจ desktop จริงแล้วเห็นป้าย `Analytical`, `ngspice`, หน่วย V/mA/µA/µF/mV ครบ และมี media query `@media (max-width: 560px)` ใน CSS แต่ tool นี้ไม่มีตัวปรับ viewport → ยังไม่ตรวจ mobile จริง |
+| **B8** | Desktop/Phone viewport, ป้าย/หน่วย/ปุ่มอ่านง่าย ไม่มีเนื้อหาถูกตัด | **NOT RUN** | ตรวจ desktop จริงแล้วเห็นป้าย `Analytical`, `ngspice`, หน่วย V/mA/µA/µF/mV ครบ ต่อมา `impeccable shot --viewport 1280x800,390x844 --full` ถ่าย render จริงทั้ง 2 ขนาดไว้ที่ `docs/evidence/impeccable/{before,after}/` และ `impeccable detect --viewport 390x844` คืน `[]` (exit 0) แต่ผู้ตรวจไม่รองรับ image input จึง **ไม่ได้ตรวจภาพด้วยตา** → ยังไม่ขอเปลี่ยนเป็น PASS |
 
 ### 13. Test log หลังเพิ่ม Lab 04
 
@@ -250,11 +250,14 @@ OK
 2. เอา `.model` จาก Starter Kit ของอาจารย์มาใส่ในช่อง BJT model
    (ตอนนี้ผล B2–B6 เกิดจาก structural default `QNPN_LAB04` ที่หน้าเว็บเตือนว่ายังไม่ validated)
 3. ~~รัน B2 → B6 บน browser จริงอีกครั้ง~~ **DONE** — ดาตาราง B2–B6 และ evidence ด้านบน
-4. ตรวจ mobile viewport ด้วย tool ที่ปรับ viewport ได้จริง (B8 ยัง NOT RUN เฉพาะส่วนนี้)
-5. ถ้าต้องการให้ตรงตามใบงานเป๊ะ ให้เปิด Playwright MCP (ต้องมี Node.js + `npx`)
-   แล้วรัน B1–B8 ซ้ำด้วย tool นั้น
-6. Impeccable skill **NOT RUN** ในเซสชันนี้ (ไม่มีให้โหลด) — UI ปรับด้วย CSS
-   ที่เขียนเองเท่านั้น ยังไม่มีหลักฐานว่าผ่าน Impeccable review
+4. ตรวจ mobile viewport ด้วยตาจากภาพ `impeccable shot` ที่มีแล้ว (B8 ยัง NOT RUN
+   เฉพาะการอ่านภาพด้วยตา — render 390×844 และ detector exit 0 มีหลักฐานแล้ว)
+5. Playwright MCP ยัง **NOT RUN**: ติดตั้ง Node.js 26.13.1 + `npx` 11.20.0 สำเร็จ
+   แต่ไม่มี tool ตัวนั้นโผล่ในเซสชัน → ใช้ in-app browser + `impeccable shot/detect`
+   แทนตามที่บันทึกไว้
+6. ~~Impeccable skill NOT RUN~~ **DONE** — ติดตั้ง Node.js แบบ user-local แล้ว
+   `npx impeccable install --yes --providers=opencode --scope=project` (skill v4.10.0)
+   รัน critique แบบ dual-agent + polish 2 จุด + before/after evidence ดู §15
 
 > หมายเหตุเรื่อง commit/push: local copy นี้ดาวน์โหลดเป็น ZIP snapshot
 > จึงไม่มี `.git` ตอนเริ่มต้น และ `git` ไม่ได้อยู่ใน PATH ของ shell นี้
@@ -267,3 +270,53 @@ OK
 > ของ ngspice-47 (ตาราง `.op` แบบสองคอลัมน์, `.print` ที่แยกคอลัมน์,
 > `vp()` เป็น radian, เลือก `ngspice_con` ก่อน) และอัปเดตหลักฐาน B2–B6
 > SHA ของ commit ล่าสุดรายงานแยกในคำตอบเพื่อไม่ให้เอกสารอ้างตัวเองผิด
+
+### 15. Impeccable UI review (2026-11-24)
+
+**ติดตั้งจริง:** Node.js 26.13.1 + `npx` 11.20.0 (zip แบบ user-local) →
+`npx impeccable install --yes --providers=opencode --scope=project`
+ได้ skill v4.10.0 ใน `.opencode/skills/impeccable/` และ engine v0.1.27
+
+**วิธีรัน critique:** dual-agent แยกกันจริง (Assessment A อ่าน source + HTTP render,
+Assessment B รัน detector + ตรวจไฟล์ screenshot) — ไม่ใช่ single-context degraded
+A ให้ Nielsen **22/40 = Acceptable**, P0 = 0, P1 = 3, P2 = 2
+snapshot: `.impeccable/critique/2026-11-24T11-14-11Z__127-0-0-1.md`
+
+**ก่อนแก้ (Assessment B):**
+
+| เป้าหมาย | exit | finding |
+|---|---|---|
+| `templates/index.html` | 2 | `flat-type-hierarchy` — false positive เพราะ detector อ่าน `url_for()` ไม่สำเร็จ จึงได้ CSS default 16px ทุก role |
+| live `1280x800` | 2 | `kicker-above-heading` (`p.eyebrow`) |
+| live `390x844` | 2 | `kicker-above-heading` + advisory `unbalanced-heading` (`#sim-form > h2`) |
+
+**ขอบเขตที่อนุมัติ:** ผู้ใช้อนุมัติ 2 จุดที่ขัดกติกา skill โดยตรงเท่านั้น
+(1) ลบ `<p class="eyebrow">` เหนือ h1 และ rule `.eyebrow` ใน CSS
+(2) เพิ่ม `text-wrap: balance` ให้ `.card h2`
+แก้เฉพาะ `templates/index.html` และ `static/style.css` — **ไม่แตะ**
+`app.py`, `dc_bias.py`, `spice_engine.py`, `charts.py` หรือค่าจาก log จริง
+
+**หลังแก้ (ตรวจจริง):**
+
+| การตรวจ | ผล |
+|---|---|
+| `impeccable detect --json http://127.0.0.1:5000/ --viewport 1280x800` | **exit 0, `[]`** |
+| `impeccable detect --json http://127.0.0.1:5000/ --viewport 390x844` | **exit 0, `[]`** |
+| `impeccable detect --json templates/index.html` | exit 2, `flat-type-hierarchy` (false positive เดิม) |
+| in-app browser `evaluate` บนหน้า render ใหม่ | `.eyebrow` = 0 ตัว, `getComputedStyle(#sim-form h2).textWrap = balance`, console error = 0 |
+| `py -m unittest discover -s tests -v` | **53 tests OK** |
+
+**หลักภาพ before/after** (ถ่ายด้วย `impeccable shot --full` จาก render จริง):
+
+- `docs/evidence/impeccable/before/1280x800-full.png` (446,774 bytes)
+- `docs/evidence/impeccable/before/390x844-full.png` (453,189 bytes)
+- `docs/evidence/impeccable/after/1280x800-full.png` (434,485 bytes)
+- `docs/evidence/impeccable/after/390x844-full.png` (429,864 bytes)
+
+**ข้อจำกัดที่ยังเปิดเผย:** ผู้ตรวจในเซสชันนี้ไม่รองรับ image input จึงไม่ได้
+เปิดดูไฟล์ PNG ด้วยตา — ผล PASS ด้าน detector/DOM เป็นข้อเท็จจริงจาก tool,
+ส่วน B8 (อ่านง่าย/ไม่ถูกตัด) ยังคง **NOT RUN** ตามเดิม
+P1 ที่เหลือ (ผลหายเมื่อเปลี่ยน action, ค่าซ่อนส่งเข้า netlist, ฟอร์มไม่ progressive
+disclose และ Bode ไม่มี legend box) ต้องแก้ใน `app.py`/`charts.py` ซึ่งอยู่นอก
+ขอบเขตที่อนุมัติ → **ไม่ปิด snapshot** และไม่ขออ้างว่า UI ผ่าน Impeccable เต็มแล้ว
+Playwright MCP ยัง NOT RUN แม้ติดตั้ง Node แล้ว เพราะไม่มี tool โผล่ในเซสชัน

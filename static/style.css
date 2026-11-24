@@ -25,7 +25,6 @@ body {
 }
 
 .hero h1 { margin: 8px 0 6px; font-size: clamp(1.5rem, 3.5vw, 2.1rem); }
-.eyebrow { margin: 0; font-size: 12px; letter-spacing: .12em; font-weight: bold; color: #d2ecfa; }
 .sub { margin: 0; color: #ddf0fd; font-size: 14px; }
 
 main { max-width: 900px; margin: 0 auto; padding: 20px 18px 48px; }
@@ -38,7 +37,7 @@ main { max-width: 900px; margin: 0 auto; padding: 20px 18px 48px; }
   margin: 18px 0;
 }
 
-.card h2 { margin: 0 0 16px; font-size: 1.2rem; color: #113c60; }
+.card h2 { margin: 0 0 16px; font-size: 1.2rem; color: #113c60; text-wrap: balance; }
 
 .grid {
   display: grid;
