@@ -18,6 +18,10 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 ENGINE = "ngspice"
+# On Windows the zip distribution ships a GUI `ngspice.exe` that detaches from
+# the console and a console `ngspice_con.exe` that batch mode can wait for.
+# Prefer the console build whenever it is available.
+ENGINE_CANDIDATES: tuple[str, ...] = ("ngspice_con", "ngspice")
 MODES: tuple[str, ...] = ("dc", "ac", "transient")
 MODE_LABELS = {
     "dc": "DC operating point (.op)",
@@ -55,6 +59,13 @@ NUMBER_RE = re.compile(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?")
 NODE_V_RE = re.compile(
     r"V\(\s*([A-Za-z0-9_#]+)\s*\)\s*[:=]?\s*([-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?)",
     re.IGNORECASE,
+)
+# `ngspice -b -o run.log` prints a plain two-column node table:
+#   vcc    1.200000e+01
+NODE_TABLE_RE = re.compile(
+    r"^\s*([A-Za-z0-9_#]+)\s+"
+    r"([-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?)\s*$",
+    re.MULTILINE,
 )
 FAILURE_RE = re.compile(
     r"fatal error|convergence failed|no convergence|error in|unrecognized|"
@@ -261,6 +272,10 @@ def _check_log(returncode: int, log_text: str, stderr: str) -> None:
 
 def _parse_operating_point(log_text: str, i: SpiceInputs) -> dict[str, object]:
     nodes = {name.lower(): float(value) for name, value in NODE_V_RE.findall(log_text)}
+    # Batch mode uses a two-column table instead of V(node)=value.
+    nodes.update(
+        {name.lower(): float(value) for name, value in NODE_TABLE_RE.findall(log_text)}
+    )
     required = ("vcc", "base", "collector", "emitter")
     missing = [name for name in required if name not in nodes]
     if missing:
@@ -295,45 +310,57 @@ def _parse_operating_point(log_text: str, i: SpiceInputs) -> dict[str, object]:
 
 
 def _parse_print_table(log_text: str, columns: tuple[str, ...]) -> list[dict[str, float]]:
-    """Parse a ngspice batch .print table into rows keyed by column name."""
+    """Parse ngspice .print output, merging paginated column groups by Index.
+
+    Batch ngspice splits wide output into several tables, e.g. AC magnitude
+    columns in one table and phase columns in another. Both repeat `Index`
+    and `frequency`, so merging on Index recovers one row per sweep point.
+    """
     lines = log_text.splitlines()
-    for index, line in enumerate(lines):
-        lowered = line.lower()
-        if not all(column.lower() in lowered for column in columns):
+    headers: list[tuple[int, list[str]]] = []
+    for position, line in enumerate(lines):
+        if "index" not in line.lower():
             continue
-
-        header = [token.lower() for token in re.findall(r"[A-Za-z0-9_#()\.\-]+", line)]
-        if header and header[0] == "index":
-            header = header[1:]
-        has_scale = any(token in ("frequency", "time") for token in header)
-        if not has_scale:
-            header = ["scale", *header]
-
-        rows: list[dict[str, float]] = []
-        for row in lines[index + 1 :]:
-            numbers = NUMBER_RE.findall(row)
-            if not numbers:
-                if rows:
-                    break
-                continue
-            if len(numbers) == len(header) + 1 and re.fullmatch(
-                r"\d+", numbers[0]
-            ):
-                numbers = numbers[1:]
-            if len(numbers) != len(header):
-                if rows:
-                    break
-                continue
-            rows.append(
-                {name: float(value) for name, value in zip(header, numbers)}
+        header = [
+            token.lower()
+            for token in re.findall(r"[A-Za-z0-9_#()\.\-]+", line)
+            if token.lower() != "index"
+        ]
+        if header:
+            has_scale = any(name in ("frequency", "time") for name in header)
+            headers.append(
+                (position, header if has_scale else ["scale", *header])
             )
-        if rows:
-            return rows
-    raise SimulationError("ไม่พบตารางผลลัพธ์จากคำสั่ง .print ของ ngspice")
+
+    merged: dict[int, dict[str, float]] = {}
+    for table_number, (position, header) in enumerate(headers):
+        end = headers[table_number + 1][0] if table_number + 1 < len(headers) else len(lines)
+        for row in lines[position + 1 : end]:
+            numbers = NUMBER_RE.findall(row)
+            if len(numbers) != len(header) + 1 or not re.fullmatch(r"\d+", numbers[0]):
+                continue
+            index = int(numbers[0])
+            values = {name: float(value) for name, value in zip(header, numbers[1:])}
+            merged.setdefault(index, {}).update(values)
+
+    rows = [merged[index] for index in sorted(merged)]
+    required = {column.lower() for column in columns}
+    if not rows or not required.issubset(rows[0].keys()):
+        raise SimulationError("ไม่พบตารางผลลัพธ์จากคำสั่ง .print ของ ngspice")
+    return rows
 
 
 def _normalise_phase(degrees: float) -> float:
     return (degrees + 180.0) % 360.0 - 180.0
+
+
+def _vp_to_degrees(radians: float) -> float:
+    """Convert ngspice batch `.print ac vp()` output from radians to degrees.
+
+    Verified against a real ngspice-47 run: midband CE phase is printed as
+    -3.14..., i.e. -180 degrees, not -3.14 degrees.
+    """
+    return math.degrees(radians)
 
 
 def _parse_ac(log_text: str) -> dict[str, object]:
@@ -352,7 +379,9 @@ def _parse_ac(log_text: str) -> dict[str, object]:
             {
                 "frequency_hz": float(scale),
                 "gain_db": 20.0 * math.log10(magnitude) if magnitude > 0 else -120.0,
-                "phase_deg": _normalise_phase(row["vp(vout)"] - row["vp(vin)"]),
+                "phase_deg": _normalise_phase(
+                    _vp_to_degrees(row["vp(vout)"] - row["vp(vin)"])
+                ),
             }
         )
     if not series:
@@ -434,7 +463,13 @@ def run_simulation(
 ) -> dict[str, object]:
     """Validate → netlist → real ngspice run → parse. Returns units + provenance."""
     inputs = parse_spice_inputs(raw)
-    exe = executable or shutil.which(ENGINE)
+    exe = executable
+    if not exe:
+        for candidate in ENGINE_CANDIDATES:
+            found = shutil.which(candidate)
+            if found:
+                exe = found
+                break
     if not exe:
         raise EngineUnavailable(
             "ไม่พบ ngspice ใน PATH ของเครื่องที่รัน Flask "

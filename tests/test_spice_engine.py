@@ -52,12 +52,44 @@ V(collector):\t9.294300 voltage
 V(emitter):\t1.242100 voltage
 """
 
+OP_TABLE_LOG = """Circuit: * Lab 04 CE reference
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+No. of Data Rows : 1
+\tNode                                  Voltage
+\t----                                  -------
+\tvout                             0.000000e+00
+\tvin                              0.000000e+00
+\temitter                          1.175805e+00
+\tcollector                        9.438841e+00
+\tbase                             1.954004e+00
+\tvcc                              1.200000e+01
+
+\tSource\tCurrent
+\t------\t-------
+
+\tvcc#branch                      -1.26462e-03
+"""
+
+# Real ngspice-47 batch mode prints vp() in radians (-170 deg -> -2.96706).
 AC_LOG = """Circuit: Lab 04 CE reference
 
 Index   frequency   vm(vin)    vm(vout)   vp(vin)    vp(vout)
-0       1.00000e+01 1.00000e-02 5.00000e-02 0.00000e+00 -1.70000e+02
-1       1.00000e+02 1.00000e-02 4.00000e-02 0.00000e+00 -1.75000e+02
-2       1.00000e+03 1.00000e-02 2.00000e-01 0.00000e+00 -1.79000e+02
+0       1.00000e+01 1.00000e-02 5.00000e-02 0.00000e+00 -2.96705973e+00
+1       1.00000e+02 1.00000e-02 4.00000e-02 0.00000e+00 -3.05432619e+00
+2       1.00000e+03 1.00000e-02 2.00000e-01 0.00000e+00 -3.12413936e+00
+"""
+
+AC_SPLIT_LOG = """Circuit: Lab 04 CE reference
+
+Index   frequency   vm(vin)    vm(vout)
+0       1.00000e+01 1.00000e-02 5.00000e-02
+1       1.00000e+03 1.00000e-02 2.00000e-01
+
+Index   frequency   vp(vin)    vp(vout)
+0       1.00000e+01 0.00000e+00 -2.96705973e+00
+1       1.00000e+03 0.00000e+00 -3.12413936e+00
 """
 
 TRAN_LOG = """Circuit: Lab 04 CE reference
@@ -138,6 +170,20 @@ class NetlistTests(unittest.TestCase):
         self.assertIn("-o", calls[0])
         self.assertNotIn("-r", calls[0])
 
+    def test_console_engine_is_preferred_on_windows(self) -> None:
+        def fake_which(name: str) -> str | None:
+            return r"C:\Spice64\bin\ngspice_con.exe" if name == "ngspice_con" else None
+
+        def fake_process(cmd: list[str], cwd: str, **kwargs):
+            (Path(cwd) / "run.log").write_text(OP_LOG, encoding="utf-8")
+            return subprocess.CompletedProcess(cmd, 0, OP_LOG, "")
+
+        with patch.object(spice_engine.shutil, "which", side_effect=fake_which):
+            with patch.object(spice_engine.subprocess, "run", side_effect=fake_process):
+                result = run_simulation(BASE)
+        self.assertEqual(result["engine"], "ngspice")
+        self.assertEqual(result["engine_status"], "success")
+
 
 class ParsingTests(unittest.TestCase):
     def test_dc_values_come_from_log(self) -> None:
@@ -146,6 +192,14 @@ class ParsingTests(unittest.TestCase):
         self.assertAlmostEqual(float(result["ic_ma"]), (12.0 - 9.2943) / 2.2, places=4)
         self.assertEqual(result["engine"], "ngspice")
         self.assertEqual(result["engine_status"], "success")
+
+    def test_dc_parser_reads_real_ngspice_batch_table(self) -> None:
+        result = run_simulation(
+            BASE, executable="ngspice", runner=runner_for(OP_TABLE_LOG)
+        )
+        self.assertAlmostEqual(float(result["vb_v"]), 1.954004, places=5)
+        self.assertAlmostEqual(float(result["vc_v"]), 9.438841, places=5)
+        self.assertAlmostEqual(float(result["ic_ma"]), (12.0 - 9.438841) / 2.2, places=5)
 
     def test_ac_gain_and_phase_are_computed_from_run(self) -> None:
         result = run_simulation(
@@ -157,6 +211,16 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(len(series), 3)
         self.assertAlmostEqual(series[0]["gain_db"], 13.9794, places=3)
         self.assertAlmostEqual(series[0]["phase_deg"], -170.0, places=3)
+
+    def test_ac_parser_merges_paginated_column_groups(self) -> None:
+        result = run_simulation(
+            {**BASE, "analysis": "ac"},
+            executable="ngspice",
+            runner=runner_for(AC_SPLIT_LOG),
+        )
+        self.assertEqual(len(result["series"]), 2)
+        self.assertAlmostEqual(result["series"][1]["gain_db"], 26.0206, places=3)
+        self.assertAlmostEqual(result["series"][1]["phase_deg"], -179.0, places=3)
 
     def test_transient_inverts_phase(self) -> None:
         result = run_simulation(

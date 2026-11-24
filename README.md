@@ -44,7 +44,10 @@ RL 10 kΩ, Cin = Cout = 10 µF, source 10 mV peak @ 1 kHz
 ### ความต้องการก่อนรันจำลอง
 
 - ต้องมี `ngspice` **อยู่ใน PATH** ของ process ที่รัน Flask (ไม่ใช่ pip package)
-  ตรวจด้วย `ngspice -v`
+  ตรวจด้วย `where ngspice` (บน Windows zip build ใช้ `ngspice_con` ซึ่งเป็น
+  console build ที่ batch mode รอจนเสร็จได้ — โค้ดเลือกตัวนี้ก่อนเสมอ)
+- ติดตั้งแล้วในเครื่องนี้: ngspice 47 ที่
+  `C:\Users\B6822019\AppData\Local\ngspice\Spice64\bin` และเพิ่มลง User PATH
 - ใส่บรรทัด `.model <ชื่อ> NPN ...` จาก Starter Kit ของอาจารย์ในช่อง **BJT model**
 - ค่าตั้งต้น `.model QNPN_LAB04 NPN` เป็นแค่ structural default ของ ngspice
   **ยังไม่ได้ตรวจกับ Starter Kit** และหน้าเว็บจะเตือนทุกครั้งที่ใช้
@@ -62,7 +65,7 @@ templates/index.html    ฟอร์ม, ป้าย provenance, ตารา�
 static/style.css        หน้าตา/responsive (CSS ล้วน ไม่มี JavaScript)
 tests/test_dc_bias.py   19 unit tests ของสมการ Lab 03
 tests/test_web.py       14 HTTP tests (8 เดิม + 6 สำหรับ Lab 04)
-tests/test_spice_engine.py  17 tests ของ adapter (fake runner, ไม่เรียก ngspice)
+tests/test_spice_engine.py  20 tests ของ adapter (fake runner, ไม่เรียก ngspice)
 opencode.json           ตั้งค่า Playwright MCP (ต้องมี Node.js + npx)
 docs/validation.md      หลักฐาน A1–A5 และตาราง B1–B8
 docs/evidence/          ภาพจากการตรวจ browser จริง
@@ -89,7 +92,7 @@ py -m flask --app app run --port 5000
 py -m unittest discover -s tests -v
 ```
 
-**50 tests ผ่านทั้งหมด** (27 เดิม + 23 ใหม่) — 27 เดิมไม่ถูกแตะ
+**53 tests ผ่านทั้งหมด** (27 เดิม + 26 ใหม่) — 27 เดิมไม่ถูกแตะ
 และยังใช้เป็น regression ของ B1
 
 ## ข้อมูลออก Lab 03
@@ -151,12 +154,14 @@ IC ในโหมด DC คำนวณจาก `(VCC − VC)/RC` และ IE
 
 สถานะ ณ ที่ตรวจล่าสุด:
 
-- B1 (regression Lab 03) **PASS**
-- B7 (invalid input / engine ไม่พร้อม) **PASS**
-- B2–B6 **NOT RUN** เพราะยังไม่มี ngspice ในเครื่องนี้
-- B8 mobile viewport **NOT RUN** (ตรวจเฉพาะ desktop)
+- B1–B7 **PASS** ด้วย ngspice จริง + in-app browser ของ OpenCode
+  (B2 DC `.op`, B3 เปลี่ยน RE, B4 AC Bode, B5 transient, B6 เปลี่ยน source,
+  B7 invalid/engine-fail)
+- B8 mobile viewport **NOT RUN** (ตรวจเฉพาะ desktop, tool นี้ปรับ viewport ไม่ได้)
 - Playwright MCP **NOT RUN** — ใช้ in-app browser ของ OpenCode แทน
   และบันทึกชื่อ tool ให้ตรงความจริง
+- ผล SPICE ยังใช้ structural default model อยู่ ต้องแทนด้วย `.model` จาก Starter Kit
+  ก่อนอ้างว่า validated ตามใบงาน
 
 ## ข้อจำกัด
 
