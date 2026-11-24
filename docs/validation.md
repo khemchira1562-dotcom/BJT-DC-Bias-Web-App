@@ -194,3 +194,66 @@ OK
 - **ทำไมเปลี่ยน `VCE_SAT` 0.3 → 0.2 V:** ใบงาน Lab 03 กำหนดเงื่อนไข
   `VCE ≤ 0.2 V` (Lab 02 ใช้ 0.3 V) และใช้ `≤` ไม่ใช่ `<` จึงแก้ทั้งค่าคงที่
   ใน `dc_bias.py` และข้อความในหน้าเว็บ
+
+---
+
+# Lab 04 — CE Amplifier Simulator
+
+## 12. Browser Acceptance B1–B8
+
+**Tool ที่ใช้จริง:** in-app browser ของ OpenCode (Chromium) + Flask server
+ที่ `http://127.0.0.1:5000/` วันที่ 2026-11-24
+
+> **เปิดเผยให้ตรงความจริง:** Playwright MCP **NOT RUN** ในเซสชันนี้
+> เพราะไม่มี Node.js/`npx` ใน PATH และไม่มี tool ตัวนั้นให้เรียก
+> จึงใช้ in-app browser แทนและบันทึกชื่อ tool ไว้ที่นี่ ผล B1/B7 จึงเป็น
+> "PASS ด้วย in-app browser" ไม่ใช่ "PASS ด้วย Playwright MCP"
+
+ตารางสถานะ (PASS / FAIL / NOT RUN):
+
+| รายการ | สิ่งที่ตรวจ | ผล | หลักฐาน |
+|---|---|---|---|
+| **B1** | Regression: กด **Calculate DC Bias** ด้วยค่า A1 แล้วได้ค่าเดิม | **PASS** | `docs/evidence/lab04_B1_regression.jpeg` — อ่านจริงได้ IC `1.230 mA`, VCE `8.052 V`, VB `1.942 V`, Region `Active`, ป้าย `Analytical · Lab 3` |
+| **B2** | DC SPICE: Run `.op` แล้วได้ VB/VE/VC/VCE/IC + model + run status | **NOT RUN** | ไม่พบ `ngspice` ใน PATH ของเครื่องที่รัน Flask → หน้าเว็บแสดง error แทน (`lab04_B7_engine_unavailable.jpeg`) โค้ดและ unit test พร้อมแล้ว แต่ยังยืนยันผลจริงไม่ได้ |
+| **B3** | เปลี่ยน RE ค่าเดียวแล้ว Run ซ้ำ ผลต้องเปลี่ยน | **NOT RUN** | ต้องอาศัย ngspice จริงจึงจะเทียบก่อน/หลังได้ |
+| **B4** | AC Bode: แกนความถี่ + gain + phase พร้อมหน่วยจาก run จริง | **NOT RUN** | parser/SVG มี unit test ครบ (`tests/test_spice_engine.py`, `tests/test_web.py`) แต่ยังไม่มี log จาก ngspice จริงมาให้แสดง |
+| **B5** | Transient ที่ 10 mV peak, 1 kHz เห็น Vin/Vout และทิศทางเฟส | **NOT RUN** | เหตุผลเดียวกับ B4 |
+| **B6** | เปลี่ยน Amplitude/Frequency แล้ว waveform เปลี่ยน | **NOT RUN** | เหตุผลเดียวกับ B4 — ห้ามใช้กราฟจำลองจาก fake runner มาแทน |
+| **B7** | Invalid / engine fail: ใส่ RE = 0 และ engine ไม่พร้อม | **PASS** | `lab04_B7_invalid_re.jpeg` → `RE (kΩ) ต้องมากกว่า 0`, HTTP 400, ไม่มีตารางผลค้าง / `lab04_B7_engine_unavailable.jpeg` → `ไม่พบ ngspice ใน PATH ... ห้ามแสดงผลสำเร็จหรือกราฟเก่า`, HTTP 400, ไม่มีผลค้าง |
+| **B8** | Desktop/Phone viewport, ป้าย/หน่วย/ปุ่มอ่านง่าย ไม่มีเนื้อหาถูกตัด | **NOT RUN** | ตรวจ desktop จริงแล้วเห็นป้าย `Analytical`, `ngspice`, หน่วย V/mA/µA/µF/mV ครบ และมี media query `@media (max-width: 560px)` ใน CSS แต่ tool นี้ไม่มีตัวปรับ viewport → ยังไม่ตรวจ mobile จริง |
+
+### 13. Test log หลังเพิ่ม Lab 04
+
+```
+py -m unittest discover -s tests -v
+
+Ran 50 tests in 0.045s
+
+OK
+```
+
+แยกจำนวน:
+
+- Lab 03 เดิม 27 ตัว (19 `test_dc_bias` + 8 `test_web`) — **ไม่ได้แก้**
+- Lab 04 ใหม่ 23 ตัว (17 `test_spice_engine` + 6 `test_web`)
+
+### 14. สิ่งที่ยังต้องทำก่อนอ้างว่า Lab 04 สำเร็จ
+
+1. ติดตั้ง ngspice ให้ `where ngspice` เจอ (หรือใส่ path ไว้ใน environment)
+2. เอา `.model` จาก Starter Kit ของอาจารย์มาใส่ในช่อง BJT model
+3. รัน B2 → B6 บน browser จริงอีกครั้ง แล้วเพิ่ม screenshot/ค่าที่อ่านได้
+4. ตรวจ mobile viewport ด้วย tool ที่ปรับ viewport ได้จริง
+5. ถ้าต้องการให้ตรงตามใบงานเป๊ะ ให้เปิด Playwright MCP (ต้องมี Node.js + `npx`)
+   แล้วรัน B1–B8 ซ้ำด้วย tool นั้น
+6. Impeccable skill **NOT RUN** ในเซสชันนี้ (ไม่มีให้โหลด) — UI ปรับด้วย CSS
+   ที่เขียนเองเท่านั้น ยังไม่มีหลักฐานว่าผ่าน Impeccable review
+
+> หมายเหตุเรื่อง commit/push: local copy นี้ดาวน์โหลดเป็น ZIP snapshot
+> จึงไม่มี `.git` ตอนเริ่มต้น และ `git` ไม่ได้อยู่ใน PATH ของ shell นี้
+> (มี git แฝงอยู่ใน GitHub Desktop) ต่อมาได้ init repo โดยดึง history จริง
+> ของ `origin/main` มาประสานแล้ว **commit เฉพาะในเครื่อง** สำเร็จบน branch `main`
+> ด้วยข้อความ `feat: add ngspice CE amplifier simulator`
+> (parent = `ea1bf707cc80733f824f4a1b7a9199a14c8a3822`)
+>
+> **ยังไม่ได้ push** — การ publish ขึ้น GitHub ต้องได้รับอนุญาตก่อน
+> (SHA ของ commit ล่าสุดจะรายงานแยกในคำตอบเพื่อไม่ให้เอกสารอ้างตัวเองผิดหลัง amend)

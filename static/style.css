@@ -137,3 +137,50 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 8px 
 button.secondary { background: #e4eef4; color: var(--blue); }
 button.secondary:hover { background: #d3e3ee; }
 .hint { font-weight: normal; font-size: 12.5px; color: var(--muted, #5b7285); }
+
+/* Lab 04 additions — presentation only, no behaviour script. */
+.field--wide { grid-column: 1 / -1; }
+button.simulate { background: var(--blue); }
+button.simulate:hover { background: #174f70; }
+
+.badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: bold;
+  letter-spacing: .02em;
+}
+.badge.analytical { background: #e8f4f1; color: #0a6a63; border: 1px solid #9fd3c7; }
+.badge.spice { background: #eef5ff; color: #264c6f; border: 1px solid #b7d1e6; }
+
+.chart { margin: 14px 0 18px; }
+.chart svg { display: block; }
+.summary { margin: 12px 0 16px; }
+.tile { border: 1px solid var(--line); background: var(--paper); border-radius: 7px; padding: 12px 14px; }
+.tile b { display: block; color: var(--blue); font-size: 12.5px; margin-bottom: 4px; }
+.tile code { overflow-wrap: anywhere; }
+.soft { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; }
+
+.notice {
+  margin: 14px 0;
+  padding: 11px 14px;
+  border-left: 4px solid var(--teal);
+  border-radius: 0 6px 6px 0;
+  background: #eaf6f2;
+  color: #135c54;
+  font-size: 14px;
+}
+
+details { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 12px; }
+summary { cursor: pointer; font-weight: bold; color: var(--blue); }
+pre { background: #f4f7fb; border: 1px solid var(--line); border-radius: 7px; padding: 12px; overflow-x: auto; font-size: 12.5px; }
+pre code { background: transparent; padding: 0; }
+
+@media (max-width: 560px) {
+  .badge { display: block; margin: 6px 0 0; }
+  .chart svg { min-width: 0; }
+  pre { font-size: 11px; }
+}

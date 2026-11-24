@@ -3,20 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BJT DC Bias Calculator — Lab 03</title>
+  <title>BJT Bias &amp; CE Amplifier Simulator — Lab 03/04</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <header class="hero">
-    <p class="eyebrow">ENG29 2121 · LAB 03</p>
-    <h1>BJT DC Bias Calculator</h1>
-    <p class="sub">NPN Common-Emitter · Voltage Divider / Fixed / Emitter Bias · Forward-Active Approximation</p>
+    <p class="eyebrow">ENG29 2121 · LAB 03 → LAB 04</p>
+    <h1>BJT Bias + CE Amplifier Simulator</h1>
+    <p class="sub">Analytical DC Bias (3 modes) · ngspice DC / AC / Transient for one CE voltage-divider circuit · Forward-Active Approximation แยกจากผลจำลอง</p>
   </header>
 
   <main>
-    <section class="card">
-      <h2>1. ป้อนค่าอุปกรณ์</h2>
-      <form method="post" action="{{ url_for('submit') }}" novalidate>
+    <form method="post" action="{{ url_for('submit') }}" novalidate>
+      <section class="card" id="bias-form">
+        <h2>1. ป้อนค่าอุปกรณ์ (Lab 3 — Analytical)</h2>
         <label class="mode-row">โหมดไบอัส
           <select name="mode">
             {% for mode in mode_labels %}
@@ -57,18 +57,65 @@
           <button type="submit" name="action" value="calculate">Calculate DC Bias</button>
           <button type="submit" name="action" value="layout" class="secondary">แสดงช่องของโหมดนี้</button>
         </div>
-      </form>
+      </section>
+
+      <section class="card" id="sim-form">
+        <h2>2. CE Amplifier Simulator (Lab 4 — ngspice)</h2>
+        <p class="muted">ใช้ VCC / R1 / R2 / RC / RE จากฟอร์มด้านบนร่วมกับวงจรอ้างอิง: Cin–Vin→Base, Cout→RL</p>
+        <label class="mode-row">Analysis Mode
+          <select name="analysis">
+            {% for analysis, label in analysis_labels.items() %}
+            <option value="{{ analysis }}" {% if analysis == display_analysis %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <span class="hint">DC = .op · AC = .ac (Bode) · Transient = .tran (Vin/Vout)</span>
+        </label>
+
+        <div class="grid">
+          <label class="field">RL (kΩ)
+            <input type="text" inputmode="decimal" name="rl" value="{{ values.rl }}">
+          </label>
+          <label class="field">Cin (µF)
+            <input type="text" inputmode="decimal" name="cin_uf" value="{{ values.cin_uf }}">
+          </label>
+          <label class="field">Cout (µF)
+            <input type="text" inputmode="decimal" name="cout_uf" value="{{ values.cout_uf }}">
+          </label>
+          <label class="field">Amplitude (mV peak)
+            <input type="text" inputmode="decimal" name="amplitude_mv" value="{{ values.amplitude_mv }}">
+          </label>
+          <label class="field">Frequency (kHz)
+            <input type="text" inputmode="decimal" name="frequency_khz" value="{{ values.frequency_khz }}">
+          </label>
+          <label class="field">AC fmin (Hz)
+            <input type="text" inputmode="decimal" name="fmin_hz" value="{{ values.fmin_hz }}">
+          </label>
+          <label class="field">AC fmax (Hz)
+            <input type="text" inputmode="decimal" name="fmax_hz" value="{{ values.fmax_hz }}">
+          </label>
+          <label class="field">Transient stop (ms)
+            <input type="text" inputmode="decimal" name="tran_stop_ms" value="{{ values.tran_stop_ms }}">
+          </label>
+          <label class="field field--wide">BJT model (บรรทัด .model เดียว)
+            <input type="text" name="model" value="{{ values.model }}">
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="submit" name="action" value="simulate" class="simulate">Run Simulation</button>
+        </div>
+      </section>
 
       {% if error %}
       <div class="alert" role="alert">
-        <strong>ไม่สามารถคำนวณได้:</strong> {{ error }}
+        <strong>ไม่สามารถดำเนินการได้:</strong> {{ error }}
       </div>
       {% endif %}
-    </section>
+    </form>
 
     {% if result %}
     <section class="card" id="results">
-      <h2>2. DC Bias Results — {{ mode_labels[result.mode] }}</h2>
+      <h2>3. DC Bias Results — {{ mode_labels[result.mode] }} <span class="badge analytical">Analytical · Lab 3</span></h2>
       <p class="region {{ result.region }}">
         Operating Region: <strong>{{ region_labels[result.region] }}</strong>
       </p>
@@ -108,8 +155,72 @@
       </p>
     </section>
     {% endif %}
+
+    {% if spice_result %}
+    <section class="card" id="spice-results">
+      <h2>4. Simulation Results — {{ analysis_labels[spice_result.analysis] }}
+        <span class="badge spice">{{ spice_result.engine }} · {{ spice_result.engine_status }}</span>
+      </h2>
+      <p class="muted">ผลจาก Engine ภายนอก — แยกจากผล Analytical ด้านบน ไม่นำมารวมเป็นชุดเดียว</p>
+
+      {% if spice_result.model == spice_default_model %}
+      <div class="warning" role="status">
+        ใช้ BJT model ตั้งต้นของ ngspice ({{ spice_result.model_name }}) ยังไม่ได้ตรวจกับ Starter Kit
+        ของอาจารย์ — ต้องแทนที่ด้วย model ที่ระบุในใบงานก่อนอ้างผลว่า validated
+      </div>
+      {% endif %}
+
+      {% if spice_result.analysis == 'dc' %}
+      <div class="tables">
+        <table>
+          <caption>DC Operating Point · ngspice .op</caption>
+          <tbody>
+            <tr><th>VB</th><td>{{ spice_result.vb_v|fmt }} V</td></tr>
+            <tr><th>VE</th><td>{{ spice_result.ve_v|fmt }} V</td></tr>
+            <tr><th>VC</th><td>{{ spice_result.vc_v|fmt }} V</td></tr>
+            <tr><th>VCE</th><td>{{ spice_result.vce_v|fmt }} V</td></tr>
+            <tr><th>IC</th><td>{{ spice_result.ic_ma|fmt }} mA</td></tr>
+            <tr><th>IE</th><td>{{ spice_result.ie_ma|fmt }} mA</td></tr>
+          </tbody>
+        </table>
+        <div class="tile">
+          <b>Model ที่ใช้</b>
+          <code>{{ spice_result.model }}</code>
+          <p class="soft">IC = (VCC − VC)/RC, IE = VE/RE จาก node voltage ที่อ่านได้จริง</p>
+        </div>
+      </div>
+      {% elif spice_result.analysis == 'ac' %}
+      <div class="chart">{{ spice_result.series|bode_svg|safe }}</div>
+      <div class="col2 summary">
+        <div class="tile"><b>ช่วงความถี่</b>{{ spice_result.summary.fmin_hz|fmt(1) }} – {{ spice_result.summary.fmax_hz|fmt(1) }} Hz</div>
+        <div class="tile"><b>Gain สูงสุด</b>{{ spice_result.summary.peak_gain_db|fmt(2) }} dB @ {{ spice_result.summary.peak_gain_freq_hz|fmt(1) }} Hz</div>
+        <div class="tile"><b>Phase @ peak gain</b>{{ spice_result.summary.peak_phase_deg|fmt(1) }}°</div>
+        <div class="tile"><b>−3 dB</b>{% if spice_result.summary.f3db_hz is defined %}{{ spice_result.summary.f3db_hz|fmt(1) }} Hz{% else %}not determined in sweep range{% endif %}</div>
+      </div>
+      {% else %}
+      <div class="chart">{{ spice_result.series|waveform_svg|safe }}</div>
+      <div class="col2 summary">
+        <div class="tile"><b>Vin peak</b>{{ spice_result.vin_peak_mv|fmt(2) }} mV</div>
+        <div class="tile"><b>Vout peak</b>{{ spice_result.vout_peak_mv|fmt(2) }} mV</div>
+      </div>
+      <p class="notice">{{ spice_result.phase_note }}</p>
+      {% endif %}
+
+      {% for warning in spice_result.warnings %}
+      <div class="warning" role="status">{{ warning }}</div>
+      {% endfor %}
+
+      <details>
+        <summary>Netlist และ Engine log (หลักฐานที่มา)</summary>
+        <h3>Netlist ที่ส่งให้ ngspice</h3>
+        <pre><code>{{ spice_result.netlist }}</code></pre>
+        <h3>Engine log (ท้าย)</h3>
+        <pre><code>{{ spice_result.log_tail }}</code></pre>
+      </details>
+    </section>
+    {% endif %}
   </main>
 
-  <footer>ENG29 2121 · Lab 03 · Flask + Python Backend</footer>
+  <footer>ENG29 2121 · Lab 03/04 · Flask + Python Backend + ngspice</footer>
 </body>
 </html>

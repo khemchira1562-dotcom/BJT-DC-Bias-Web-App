@@ -1,160 +1,167 @@
-# BJT DC Bias Web App — ENG29 2121 Lab 03
+# BJT Bias + CE Amplifier Simulator — ENG29 2121 Lab 03/04
 
-Flask Web Application สำหรับคำนวณ **DC Operating Point** ของวงจร NPN
-Common-Emitter ด้วยแบบจำลอง Forward-Active (β และ VBE คงที่) เลือกได้สามโหมด
+Flask web app ที่ทำสองอย่างแยกชัดเจน:
+
+1. **Lab 03 — Analytical DC Bias** คำนวณ DC Operating Point ด้วยแบบจำลอง
+   Forward-Active (β และ VBE คงที่) ได้ 3 โหมด: `divider`, `fixed`, `emitter`
+2. **Lab 04 — CE Amplifier Simulator** สร้าง netlist ของวงจร reference เดียว
+   แล้วเรียก **ngspice จริง** ผ่าน `subprocess` เพื่อรัน `.op`, `.ac`, `.tran`
+   อ่านค่าจาก log ที่ solver คืนมาเท่านั้น ไม่มีค่าสำเร็จที่ฝังไว้ในโค้ด
+
+ผล **Analytical** กับผล **SPICE** แสดงคนละการ์ด มีป้ายกำกับแหล่งที่มาเสมอ
+และห้ามนำมารวมกัน
+
+## โหมดไบอัส Lab 03
 
 | โหมด | อุปกรณ์ | ค่าที่ต้องกรอกเพิ่ม |
 |---|---|---|
-| **Voltage Divider Bias** | R1, R2, RC, RE | – (โหมดเดิมของ Lab 02) |
+| **Voltage Divider Bias** | R1, R2, RC, RE | – |
 | **Fixed Bias** | RB, RC (Emitter ลงกราวด์) | RB |
 | **Emitter Bias** | RB, RC, RE | RB, RE |
 
-หน้าเว็บรับค่าอุปกรณ์ แล้วส่ง HTTP POST ไปให้ Python Backend คำนวณ
-ไม่ใช่ตัวเลขที่ฝังไว้ใน HTML — เลือก Divider ด้วยค่าเดิมของ Lab 02 แล้วผล
-ต้องเท่าเดิมเป๊ะ (IC 1.2299 mA, VCE 8.0522 V)
+กด **แสดงช่องของโหมดนี้** หลังสลับ dropdown ทุกครั้ง ปุ่มนี้ render ฟอร์มใหม่
+โดยไม่คำนวณ เพื่อกันไม่ให้ค่าที่ซ่อนอยู่ถูกส่งไปโดยผู้ใช้ไม่เห็น
 
-### ขั้นตอนใช้งาน
+## วงจรอ้างอิง Lab 04
 
-1. เลือกโหมดจาก dropdown **โหมดไบอัส**
-2. กด **แสดงช่องของโหมดนี้** เพื่อให้ฟอร์มแสดงเฉพาะช่องที่โหมดนั้นต้องใช้
-3. กรอกค่า แล้วกด **Calculate DC Bias**
+ใช้ VCC / R1 / R2 / RC / RE จากฟอร์ม Lab 03 ร่วมกับส่วนเชื่อม AC:
 
-> ต้องกดปุ่มที่ 2 ก่อนคำนวณเมื่อเพิ่งสลับโหมด เพราะช่องที่ซ่อนอยู่ (เช่น RB ตอน
-> อยู่โหมด Divider) ยังถูกส่งไปกับฟอร์ม ถ้ากด Calculate ทันทีจะได้ผลที่คำนวณจาก
-> ค่าที่ผู้ใช้ยังไม่เห็น — ปุ่มนี้จึงมีไว้กันความเข้าใจผิดนั้น
+```
+VIN → Cin → Base          R1: VCC→Base      R2: Base→GND
+Collector → Cout → Vout → RL → GND
+RC: VCC→Collector         RE: Emitter→GND   Q1: NPN
+```
+
+ค่าตั้งต้นตามใบงาน: VCC 12 V, R1 100 kΩ, R2 22 kΩ, RC 2.2 kΩ, RE 1 kΩ,
+RL 10 kΩ, Cin = Cout = 10 µF, source 10 mV peak @ 1 kHz
+
+| Analysis | คำสั่ง ngspice | ผลที่แสดง |
+|---|---|---|
+| DC | `.op` | VB, VE, VC, VCE, IC, IE พร้อม model และ engine status |
+| AC | `.ac dec 20 fmin fmax` + `.print ac` | กราฟ Bode (gain dB, phase°) + ค่าช่วงความถี่ |
+| Transient | `.tran` + `.print tran` | กราฟ Vin/Vout ตามเวลา (mV vs ms) + ทิศทางเฟส |
+
+### ความต้องการก่อนรันจำลอง
+
+- ต้องมี `ngspice` **อยู่ใน PATH** ของ process ที่รัน Flask (ไม่ใช่ pip package)
+  ตรวจด้วย `ngspice -v`
+- ใส่บรรทัด `.model <ชื่อ> NPN ...` จาก Starter Kit ของอาจารย์ในช่อง **BJT model**
+- ค่าตั้งต้น `.model QNPN_LAB04 NPN` เป็นแค่ structural default ของ ngspice
+  **ยังไม่ได้ตรวจกับ Starter Kit** และหน้าเว็บจะเตือนทุกครั้งที่ใช้
+- ถ้า engine ไม่พร้อม / รันแล้ว error / timeout / log ไม่มีตาราง 결과
+  หน้าเว็บจะแสดง HTTP 400 พร้อมข้อความไทย และ **ไม่มีกราฟหรือผลเก่าค้าง**
 
 ## โครงสร้าง
 
 ```
-app.py                  Flask routes (GET /, POST /) + เลือกโหมดที่แสดง
-dc_bias.py              Validation + สมการวิศวกรรม (ไม่รู้จัก HTML/HTTP)
-templates/index.html    ฟอร์ม, dropdown โหมด, ตารางผลลัพธ์ (Jinja)
+app.py                  Flask routes: อ่านฟอร์ม → เรียก dc_bias หรือ spice_engine → render
+dc_bias.py              Lab 03: validation + สมการ + region (ไม่ import Flask)
+spice_engine.py         Lab 04: validate → netlist → subprocess ngspice → parse log
+charts.py               แปลง array ที่ parse แล้วเป็น inline SVG (ไม่มี physics)
+templates/index.html    ฟอร์ม, ป้าย provenance, ตาราง/กราฟ (Jinja, ไม่มีสมการ)
 static/style.css        หน้าตา/responsive (CSS ล้วน ไม่มี JavaScript)
-tests/test_dc_bias.py   Unit tests ของสมการ
-tests/test_web.py       HTTP tests ด้วย Flask test client
-opencode.json           ตั้งค่า MCP server (Playwright) สำหรับตรวจผ่าน Browser
-docs/                   Design note, validation, reflection, evidence/
+tests/test_dc_bias.py   19 unit tests ของสมการ Lab 03
+tests/test_web.py       14 HTTP tests (8 เดิม + 6 สำหรับ Lab 04)
+tests/test_spice_engine.py  17 tests ของ adapter (fake runner, ไม่เรียก ngspice)
+opencode.json           ตั้งค่า Playwright MCP (ต้องมี Node.js + npx)
+docs/validation.md      หลักฐาน A1–A5 และตาราง B1–B8
+docs/evidence/          ภาพจากการตรวจ browser จริง
 ```
 
 ## การติดตั้งและรัน
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1          # macOS/Linux: source .venv/bin/activate
-python -m pip install -r requirements.txt
-python -m flask --app app run --port 5000
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+py -m pip install -r requirements.txt
+py -m flask --app app run --port 5000
 ```
 
-เปิด <http://127.0.0.1:5000/>
+> ในเครื่องนี้ `python` เป็น Microsoft Store alias ที่ใช้ไม่ได้ ให้ใช้ `py`
+> (ใน venv ที่ activate แล้วใช้ `python` ได้ตามปกติ)
 
-> ต้องเปิดผ่าน Flask server เท่านั้น การ double-click `templates/index.html`
-> (file://) จะไม่มีการคำนวณ เพราะไม่มี Python Backend
+เปิด <http://127.0.0.1:5000/> การ double-click `templates/index.html` (file://)
+จะไม่มีการคำนวณ เพราะไม่มี Python Backend
 
 ## การรัน tests
 
 ```powershell
-.venv\Scripts\python -m unittest discover -s tests -v
+py -m unittest discover -s tests -v
 ```
 
-27 tests (19 unit + 8 HTTP) — ตามใบงาน Lab 03 ไม่ได้เพิ่ม unittest ใหม่
-สำหรับสองโหมดใหม่ แต่ปรับวิธีอ่านผลให้ตรงกับ `dict` ที่คืนจาก `calculate()`
-การตรวจรับของโหมดใหม่ทำผ่าน Browser (ดูหัวข้อถัดไป)
+**50 tests ผ่านทั้งหมด** (27 เดิม + 23 ใหม่) — 27 เดิมไม่ถูกแตะ
+และยังใช้เป็น regression ของ B1
 
-## ช่องอินพุตต่อโหมด
+## ข้อมูลออก Lab 03
 
-| ช่อง | divider | fixed | emitter |
-|---|---|---|---|
-| VCC (V) | ✓ | ✓ | ✓ |
-| R1, R2 (kΩ) | ✓ | – | – |
-| RB (kΩ) | – | ✓ | ✓ |
-| RC (kΩ) | ✓ | ✓ | ✓ |
-| RE (kΩ) | ✓ | – | ✓ |
-| β | ✓ | ✓ | ✓ |
-| VBE (V) | ✓ | ✓ | ✓ |
-
-ช่องที่ไม่ใช้จะถูกซ่อนด้วย CSS (`field--unused`) แต่ยังถูกส่งไปกับฟอร์ม
-`parse_inputs()` อ่านเฉพาะช่องของโหมดนั้น ค่าขยะในช่องอื่นจึงไม่ทำให้ error
-
-## ข้อมูลออก
-
-| ข้อมูลออก | หน่วย | คีย์ใน `dict` |
+| ข้อมูลออก | หน่วย | คีย์ |
 |---|---|---|
 | VB, VE, VC, VCE | V | `vb_v, ve_v, vc_v, vce_v` |
 | IB | µA | `ib_ua` |
 | IC, IE | mA | `ic_ma, ie_ma` |
 | VTH, RTH (divider) | V, kΩ | `vth_v, rth_kohm` |
-| Region | – | `region` (`active`/`cutoff`/`saturation`) |
-| คำเตือน | – | `warnings` |
+| Region | – | `active`/`cutoff`/`saturation` |
 
-## สมการ
+สมการ: `IB = (VTH−VBE)/((RTH+(β+1)RE)·1000)` (divider),
+`IC = β·IB`, `IE = (β+1)·IB`, `VC = VCC−IC·RC·1000`, `VCE = VC−VE`
 
-```
-Divider : VTH = VCC·R2/(R1+R2) ,  RTH = R1·R2/(R1+R2)      [kΩ]
-          IB  = (VTH − VBE) / ((RTH + (β+1)·RE) · 1000)
-Fixed   : IB  = (VCC − VBE) / (RB · 1000)
-Emitter : IB  = (VCC − VBE) / ((RB + (β+1)·RE) · 1000)
+## ข้อมูลออก Lab 04
 
-ใช้ร่วมกันทุกโหมด
-IC  = β·IB ,  IE = (β+1)·IB
-VE  = IE·RE·1000            (Fixed: RE = 0 → VE = 0)
-VB  = VE + VBE
-VC  = VCC − IC·RC·1000
-VCE = VC − VE
-```
+| ข้อมูลออก | หน่วย | คีย์ |
+|---|---|---|
+| Node voltage / current | V, mA | `vb_v, ve_v, vc_v, vce_v, ic_ma, ie_ma` |
+| Gain / phase | dB, degree | `gain_db, phase_deg` ใน `series` |
+| เวลา / แรงดัน | s, V → แสดงเป็น ms, mV | `time_s, vin_v, vout_v` |
+| Engine status | – | `engine`, `engine_status` |
+| หลักฐาน | – | `model`, `netlist`, `log_tail` |
+
+IC ในโหมด DC คำนวณจาก `(VCC − VC)/RC` และ IE จาก `VE/RE`
+โดยใช้ **node voltage ที่อ่านจาก log จริง** ไม่ได้เอาค่าจาก netlist มาแทน
 
 ## Validation และ Warning
 
-**อินพุตผิด → HTTP 400 + ข้อความไทย (หน้าเว็บไม่ล้ม)**
+อินพุตผิด → HTTP 400 + ข้อความไทย:
 
-- ค่าหายไป, ไม่ใช่ตัวเลข, เป็น `inf`/`nan`
-- ตัวต้านทานหรือ VCC ≤ 0, β ≤ 0, VBE < 0, VBE ≥ VCC
-- ไม่ส่ง `mode` มา หรือส่งค่าที่ไม่รู้จัก → error (ไม่เดาเป็น Divider)
+- ค่าหาย / ไม่ใช่ตัวเลข / `inf` / `nan`
+- R, VCC, β, RL, Cin, Cout ≤ 0, frequency ≤ 0
+- `fmax ≤ fmin`, `fmax > 1 GHz`, analysis ไม่รู้จัก
+- model ไม่ใช่บรรทัด `.model <ชื่อ> NPN ...` (กัน injection)
 
-**แบบจำลองใช้ไม่ได้ → warning (ยังแสดงผล)**
+แบบจำลองใช้ไม่ได้ → warning (ยังแสดงผล):
 
-- `IB ≤ 0` → Region **Cutoff** (แสดงกระแสเป็นศูนย์)
-- `VCE ≤ VCE_SAT = 0.2 V` → Region **Saturation** + เตือนว่า
-  Forward-Active Approximation ไม่น่าเชื่อถือ
+- Lab 03: `IB ≤ 0` → Cutoff, `VCE ≤ 0.2 V` → Saturation
+- Lab 04 AC: ไม่เจอจุดตัด −3 dB → แสดง `not determined in sweep range`
+- Lab 04 transient: ตรวจทิศทางเฟสจาก correlation ของ Vin/Vout
+- ใช้ model ตั้งต้น → เตือนว่ายังไม่ validated กับ Starter Kit
 
-## ค่าอ้างอิง A1–A5 (VCC = 12 V, RC = 2.2 kΩ, β = 100, VBE = 0.70 V)
+## ค่าอ้างอิง A1–A5 (Lab 03)
 
 | กรณี | โหมด | อินพุต | IC | VCE |
 |---|---|---|---|---|
 | A1 | divider | R1=100k, R2=22k, RE=1k | 1.2299 mA | 8.0522 V |
 | A2 | fixed | RB=1 MΩ | 1.1300 mA | 9.5140 V |
-| A3 | emitter | RB=1 MΩ, RE=1 kΩ | 1.0263 mA | 8.7054 V |
-| A4 | emitter | RB=1 MΩ, RE=2 kΩ | 0.9401 mA | 8.0328 V |
+| A3 | emitter | RB=1 MΩ, RE=1k | 1.0263 mA | 8.7054 V |
+| A4 | emitter | RB=1 MΩ, RE=2k | 0.9401 mA | 8.0328 V |
 | A5 | fixed | RB=0 | — | HTTP 400 |
 
-ภาพหน้าจอจากการตรวจผ่าน Playwright MCP อยู่ที่ `docs/evidence/`
-รายละเอียดการคำนวณมือและค่าที่อ่านได้จริงอยู่ที่ `docs/validation.md`
+## หลักฐานและสถานะ Lab 04
 
-## การตรวจผ่าน Browser ด้วย Playwright MCP
+ดู `docs/validation.md` §12 สำหรับตาราง **B1–B8** แบบ PASS/FAIL/NOT RUN
+และ `docs/evidence/` สำหรับภาพจาก browser จริง
 
-`opencode.json` ตั้ง MCP server ไว้ให้แล้ว (ต้องมี Node.js และ `npx` ใน PATH)
+สถานะ ณ ที่ตรวจล่าสุด:
 
-```json
-{
-  "mcp": {
-    "servers": {
-      "playwright": {
-        "type": "local",
-        "command": ["npx", "-y", "@playwright/mcp@latest", "--browser", "chrome", "--isolated"]
-      }
-    }
-  }
-}
-```
-
-ตรวจสถานะด้วย `opencode mcp list` ต้องขึ้น `✓ playwright connected`
-แล้วสั่ง agent ให้เปิด <http://127.0.0.1:5000/> กรอกค่า และอ่านผลจากหน้าเว็บ
-
-> `@playwright/mcp@latest` ไม่ได้ pin เวอร์ชัน — เปิดใช้เฉพาะเมื่อต้องการตรวจซ้ำ
-> เพราะ `npx -y` จะดาวน์โหลดแพ็กเกจทุกครั้งที่เริ่ม server และต้องมี Node.js
-> อยู่ใน `PATH` ของ process ที่รัน OpenCode
+- B1 (regression Lab 03) **PASS**
+- B7 (invalid input / engine ไม่พร้อม) **PASS**
+- B2–B6 **NOT RUN** เพราะยังไม่มี ngspice ในเครื่องนี้
+- B8 mobile viewport **NOT RUN** (ตรวจเฉพาะ desktop)
+- Playwright MCP **NOT RUN** — ใช้ in-app browser ของ OpenCode แทน
+  และบันทึกชื่อ tool ให้ตรงความจริง
 
 ## ข้อจำกัด
 
-แบบจำลองนี้ไม่ใช่ SPICE/ngspice, ใช้ β คงที่, ไม่มี Early effect,
-ไม่มี DC Load Line / AC / Transient / bypass capacitor และไม่ควรใช้
-ตัดสินใจออกแบบจริงนอกช่วง Forward-Active
+- แบบจำลอง Lab 03 ไม่ใช่ SPICE, ใช้ β คงที่, ไม่มี Early effect
+- Lab 04 มี **วงจร reference เดียว** ตามใบงาน (ไม่ใช่เครื่องมือออกแบบทั่วไป)
+- กราฟถูกสร้างจากผล `.print` จริงเท่านั้น ไม่มีข้อมูล hard-code
+- ไม่เพิ่ม dependency นอกเหนือ Flask: SVG ถูก generate จาก array ใน `charts.py`
+- ผลทั้งสองชุดไม่ควรใช้ตัดสินใจออกแบบนอกช่วง Forward-Active
